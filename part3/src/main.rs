@@ -10,7 +10,8 @@ const CODE: &[u8] = &[
     0xf4, /* hlt */
 ];
 
-const CODE_MEMORY_ADDR: u64 = 0x1000;
+const CODE_MEMORY_HVA: u64 = 0xcafe_0000;
+const CODE_MEMORY_GPA: u64 = 0x1000;
 const CODE_MEMORY_SIZE: usize = 0x1000;
 
 fn main() -> anyhow::Result<()> {
@@ -26,7 +27,7 @@ fn main() -> anyhow::Result<()> {
     // Allocate and prepare the guest memory
     let host_virtual_address = unsafe {
         libc::mmap(
-            std::ptr::null_mut(),
+            CODE_MEMORY_HVA as *mut libc::c_void,
             CODE_MEMORY_SIZE,
             PROT_READ | PROT_WRITE | PROT_EXEC,
             MAP_PRIVATE | MAP_ANONYMOUS,
@@ -34,12 +35,16 @@ fn main() -> anyhow::Result<()> {
             0,
         )
     };
+    eprintln!(
+        "Mapped guest memory at: 0x{:x}",
+        host_virtual_address as u64
+    );
 
     // Create mapping between host and guest memory
     let slot = 0;
     let mem_region = kvm_userspace_memory_region {
         slot,
-        guest_phys_addr: CODE_MEMORY_ADDR,
+        guest_phys_addr: CODE_MEMORY_GPA,
         memory_size: CODE_MEMORY_SIZE as u64,
         userspace_addr: host_virtual_address as u64,
         flags: 0,
@@ -62,7 +67,7 @@ fn main() -> anyhow::Result<()> {
     vcpu.set_sregs(&vcpu_sregs)?;
 
     let mut vcpu_regs = vcpu.get_regs()?;
-    vcpu_regs.rip = CODE_MEMORY_ADDR;
+    vcpu_regs.rip = CODE_MEMORY_GPA;
     vcpu_regs.rflags = 2;
     vcpu.set_regs(&vcpu_regs)?;
 

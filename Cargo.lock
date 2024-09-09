@@ -68,6 +68,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vm3"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "kvm-bindings",
+ "kvm-ioctls",
+ "libc",
+]
+
+[[package]]
 name = "vmm-sys-util"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

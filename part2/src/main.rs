@@ -1,14 +1,13 @@
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
 use libc::{MAP_ANONYMOUS, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE};
-use std::io::Write;
 
 const CODE: &[u8] = &[
-    0xba, 0xf8, 0x03, /* mov $0x3f8, %dx */
-    0xb0, b'A', /* mov $'A', %al */
-    0xee, /* out %al, (%dx) */
-    0xb0, b'\n', /* mov $'\n', %al */
-    0xee,  /* out %al, (%dx) */
+    0xba, 0xf8, 0x03, /* mov dx, 0x3f8 */
+    0xb0, b'A', /* mov al, 'A' */
+    0xee, /* out dx, al */
+    0xb0, b'\n', /* mov al, '\n' */
+    0xee,  /* out dx, al */
     0xf4,  /* hlt */
 ];
 
@@ -26,7 +25,7 @@ fn main() -> anyhow::Result<()> {
     let mut vcpu = vm.create_vcpu(0)?;
 
     // Allocate guest memory on the host
-    let host_virtual_address: *mut u8 = unsafe {
+    let host_virtual_address = unsafe {
         libc::mmap(
             std::ptr::null_mut(),
             CODE_MEMORY_SIZE,
@@ -34,7 +33,7 @@ fn main() -> anyhow::Result<()> {
             MAP_PRIVATE | MAP_ANONYMOUS,
             -1,
             0,
-        ) as *mut u8
+        )
     };
 
     // Create mapping between host and guest memory
@@ -46,12 +45,15 @@ fn main() -> anyhow::Result<()> {
         userspace_addr: host_virtual_address as u64,
         flags: 0,
     };
-    unsafe { vm.set_user_memory_region(mem_region).unwrap() };
+    unsafe { vm.set_user_memory_region(mem_region)? };
 
     // Host writes to guest memory.
     unsafe {
-        let mut slice = std::slice::from_raw_parts_mut(host_virtual_address, CODE_MEMORY_SIZE);
-        slice.write(&CODE).unwrap();
+        libc::memcpy(
+            host_virtual_address,
+            CODE.as_ptr() as *const libc::c_void,
+            CODE.len(),
+        );
     }
 
     // Set initial vCPU registers

@@ -1,13 +1,12 @@
+//use byteorder::{ByteOrder, LittleEndian};
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
 use libc::{MAP_ANONYMOUS, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE};
 
 const CODE: &[u8] = &[
-    0x66, 0x0f, 0xc7, 0xf0, /* rdrand ax */
-    0xba, 0xf8, 0x03,  /* mov dx, 0x3f8 */
-    0xee, /* out dx, al */
-    0x66, 0xbb, 0xF0, 0x10, /* mov bx, 0x10f0 */
-    0x67, 0x66, 0x89, 0x07, /* mov WORD PTR [bx], ax */
+    0x0f, 0xc7, 0xf0, /* rdrand ax */
+    0xbb, 0x10, 0x10, /* mov bx, 0x1010 */
+    0x89, 0x07, /* mov WORD PTR [bx], ax */
     0xf4, /* hlt */
 ];
 
@@ -69,14 +68,7 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         match vcpu.run()? {
-            VcpuExit::IoOut(_addr, data) => {
-                println!("Random number: 0x{:x}", data[0]);
-            }
             VcpuExit::Hlt => {
-                let slice = unsafe {
-                    std::slice::from_raw_parts(host_virtual_address as *const u8, CODE_MEMORY_SIZE)
-                };
-                eprintln!("Read from mem at 0x{:x}, 0x{:x}", slice[240], slice[241]);
                 eprintln!("Received Halt");
                 break;
             }

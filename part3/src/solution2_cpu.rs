@@ -12,7 +12,6 @@ const CODE: &[u8] = &[
     0xf4, /* hlt */
 ];
 
-const CODE_MEMORY_HVA: u64 = 0xcafe_0000;
 const CODE_MEMORY_GPA: u64 = 0x1000;
 const CODE_MEMORY_SIZE: usize = 0x1000;
 
@@ -29,7 +28,7 @@ fn main() -> anyhow::Result<()> {
     // Allocate and prepare the guest memory
     let host_virtual_address = unsafe {
         libc::mmap(
-            CODE_MEMORY_HVA as *mut libc::c_void,
+            std::ptr::null_mut(),
             CODE_MEMORY_SIZE,
             PROT_READ | PROT_WRITE | PROT_EXEC,
             MAP_PRIVATE | MAP_ANONYMOUS,
@@ -37,10 +36,6 @@ fn main() -> anyhow::Result<()> {
             0,
         )
     };
-    eprintln!(
-        "Mapped guest memory at: 0x{:x}",
-        host_virtual_address as u64
-    );
 
     // Create mapping between host and guest memory
     let slot = 0;

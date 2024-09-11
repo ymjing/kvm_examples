@@ -26,16 +26,6 @@ fn main() -> anyhow::Result<()> {
     // Create vCPU
     let mut vcpu = vm.create_vcpu(0)?;
 
-    let mut dbg = kvm_guest_debug {
-        control: KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_HW_BP,
-        ..Default::default()
-    };
-    dbg.arch.debugreg[0] = 0x1003; // after rdrand
-    dbg.arch.debugreg[7] = 0x0600;
-    // Set global breakpoint enable flag
-    dbg.arch.debugreg[7] |= 2;
-    vcpu.set_guest_debug(&dbg)?;
-
     // Allocate and prepare the guest memory
     let host_virtual_address = unsafe {
         libc::mmap(
@@ -83,6 +73,15 @@ fn main() -> anyhow::Result<()> {
     vcpu_regs.rflags = 2;
     vcpu.set_regs(&vcpu_regs)?;
 
+    let mut dbg = kvm_guest_debug {
+        control: KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_HW_BP,
+        ..Default::default()
+    };
+    dbg.arch.debugreg[0] = 0x1003; // after rdrand
+    // Set bit 10, bit 9 (GE), bit 1 (1st dbg register)
+    dbg.arch.debugreg[7] = 1 << 10 | 1 << 9 | 1 << 1;
+    vcpu.set_guest_debug(&dbg)?;
+
     loop {
         match vcpu.run()? {
             VcpuExit::Hlt => {
@@ -91,7 +90,7 @@ fn main() -> anyhow::Result<()> {
             }
             VcpuExit::Debug(d) => {
                 let ax = vcpu.get_regs()?.rax;
-                eprintln!("rip: 0x{:x}, rax: 0x{:x}", d.pc, ax);
+                eprintln!("pc: 0x{:x}, ax: 0x{:x}", d.pc, ax);
                 vcpu.set_guest_debug(&kvm_guest_debug::default())?;
             }
             r => anyhow::bail!("Unexpected exit reason: {:?}", r),
